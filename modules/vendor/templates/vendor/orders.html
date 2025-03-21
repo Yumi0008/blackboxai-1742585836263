@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block title %}Purchase Orders{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+    .filter-section {
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+    }
+    .order-card {
+        transition: all 0.3s ease;
+    }
+    .order-card:hover {
+        transform: translateY(-5px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>
+                    <i class="fas fa-file-alt me-2"></i>Purchase Orders
+                </h2>
+                <div>
+                    <button onclick="exportOrders()" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-file-export me-2"></i>Export Data
+                    </button>
+                    <a href="{{ url_for('vendor.add_order') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>New Order
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-section mb-4">
+        <form id="filterForm" class="row g-3">
+            <div class="col-md-3">
+                <label for="vendor" class="form-label">Vendor</label>
+                <select class="form-select" id="vendor" name="vendor">
+                    <option value="">All Vendors</option>
+                    {% for vendor in vendors %}
+                    <option value="{{ vendor.id }}">{{ vendor.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="dateRange" class="form-label">Date Range</label>
+                <input type="text" class="form-control" id="dateRange" name="dateRange">
+            </div>
+            <div class="col-md-3">
+                <label for="status" class="form-label">Order Status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All Status</option>
+                    <option value="draft">Draft</option>
+                    <option value="placed">Placed</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="received">Received</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="payment" class="form-label">Payment Status</label>
+                <select class="form-select" id="payment" name="payment">
+                    <option value="">All Payment Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="partial">Partial</option>
+                    <option value="paid">Paid</option>
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- Order Statistics -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Orders</h6>
+                    <h2 id="totalOrders">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Amount</h6>
+                    <h2 id="totalAmount">₹0.00</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <h6 class="card-title">Pending Orders</h6>
+                    <h2 id="pendingOrders">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Received Orders</h6>
+                    <h2 id="receivedOrders">0</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Order #</th>
+                            <th>Date</th>
+                            <th>Vendor</th>
+                            <th>Items</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Payment</th>
+                            <th>Expected Delivery</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersTableBody">
+                        {% for order in orders %}
+                        <tr>
+                            <td>{{ order.order_number }}</td>
+                            <td>{{ order.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                <a href="{{ url_for('vendor.vendor_details', vendor_id=order.vendor.id) }}">
+                                    {{ order.vendor.name }}
+                                </a>
+                            </td>
+                            <td>{{ order.items|length }}</td>
+                            <td>₹{{ "%.2f"|format(order.total_amount) }}</td>
+                            <td>
+                                <span class="badge bg-{{ 
+                                    'success' if order.status == 'received'
+                                    else 'warning' if order.status == 'placed'
+                                    else 'info' if order.status == 'confirmed'
+                                    else 'danger' if order.status == 'cancelled'
+                                    else 'secondary' 
+                                }}">
+                                    {{ order.status.upper() }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ 
+                                    'success' if order.payment_status == 'paid'
+                                    else 'warning' if order.payment_status == 'partial'
+                                    else 'danger' 
+                                }}">
+                                    {{ order.payment_status.upper() }}
+                                </span>
+                            </td>
+                            <td>
+                                {{ order.expected_delivery_date.strftime('%Y-%m-%d') if order.expected_delivery_date else '-' }}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{{ url_for('vendor.order_details', order_id=order.id) }}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if order.status == 'draft' %}
+                                    <button onclick="updateOrderStatus('{{ order.id }}', 'placed')" 
+                                            class="btn btn-sm btn-outline-success">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+// Initialize date range picker
+flatpickr("#dateRange", {
+    mode: "range",
+    dateFormat: "Y-m-d",
+    defaultDate: [
+        new Date().setDate(new Date().getDate() - 30),
+        new Date()
+    ]
+});
+
+// Update order statistics
+function updateStatistics(orders) {
+    const total = orders.length;
+    const totalAmount = orders.reduce((sum, o) => sum + o.total_amount, 0);
+    const pending = orders.filter(o => o.status === 'placed' || o.status === 'confirmed').length;
+    const received = orders.filter(o => o.status === 'received').length;
+    
+    document.getElementById('totalOrders').textContent = total;
+    document.getElementById('totalAmount').textContent = `₹${totalAmount.toFixed(2)}`;
+    document.getElementById('pendingOrders').textContent = pending;
+    document.getElementById('receivedOrders').textContent = received;
+}
+
+// Load orders based on filters
+function loadOrders() {
+    const params = new URLSearchParams(new FormData(document.getElementById('filterForm')));
+    
+    fetch(`/vendor/api/orders?${params}`)
+        .then(response => response.json())
+        .then(orders => {
+            updateStatistics(orders);
+            
+            const tbody = document.getElementById('ordersTableBody');
+            tbody.innerHTML = orders.map(order => `
+                <tr>
+                    <td>${order.order_number}</td>
+                    <td>${new Date(order.created_at).toLocaleDateString()}</td>
+                    <td>
+                        <a href="/vendor/vendors/${order.vendor_id}">
+                            ${order.vendor_name}
+                        </a>
+                    </td>
+                    <td>${order.items.length}</td>
+                    <td>₹${order.total_amount.toFixed(2)}</td>
+                    <td>
+                        <span class="badge bg-${
+                            order.status === 'received' ? 'success' :
+                            order.status === 'placed' ? 'warning' :
+                            order.status === 'confirmed' ? 'info' :
+                            order.status === 'cancelled' ? 'danger' : 'secondary'
+                        }">
+                            ${order.status.toUpperCase()}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge bg-${
+                            order.payment_status === 'paid' ? 'success' :
+                            order.payment_status === 'partial' ? 'warning' : 'danger'
+                        }">
+                            ${order.payment_status.toUpperCase()}
+                        </span>
+                    </td>
+                    <td>${order.expected_delivery_date ? 
+                         new Date(order.expected_delivery_date).toLocaleDateString() : '-'}</td>
+                    <td>
+                        <div class="btn-group">
+                            <a href="/vendor/orders/${order.id}" 
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            ${order.status === 'draft' ? `
+                                <button onclick="updateOrderStatus('${order.id}', 'placed')" 
+                                        class="btn btn-sm btn-outline-success">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `).join('') || `
+                <tr>
+                    <td colspan="9" class="text-center">No orders found</td>
+                </tr>
+            `;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading orders');
+        });
+}
+
+// Update order status
+function updateOrderStatus(orderId, newStatus) {
+    if (confirm(`Are you sure you want to ${newStatus} this order?`)) {
+        fetch(`/vendor/api/orders/${orderId}/status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadOrders();
+            } else {
+                alert('Error updating order status');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating order status');
+        });
+    }
+}
+
+// Export orders
+function exportOrders() {
+    const params = new URLSearchParams(new FormData(document.getElementById('filterForm')));
+    window.location.href = `/vendor/api/orders/export?${params}`;
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    // Load initial data
+    loadOrders();
+    
+    // Set up filter change handlers
+    document.querySelectorAll('#filterForm select').forEach(select => {
+        select.addEventListener('change', loadOrders);
+    });
+    
+    document.getElementById('dateRange').addEventListener('change', loadOrders);
+});
+</script>
+{% endblock %}
