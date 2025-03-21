@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}Kitchen Display{% endblock %}
+
+{% block extra_css %}
+<style>
+    .order-card {
+        transition: all 0.3s ease;
+    }
+    
+    .order-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .priority-high {
+        border-left: 5px solid #dc3545;
+    }
+    
+    .priority-normal {
+        border-left: 5px solid #0d6efd;
+    }
+    
+    .priority-low {
+        border-left: 5px solid #6c757d;
+    }
+    
+    .status-pending {
+        background-color: #fff3cd;
+    }
+    
+    .status-in_progress {
+        background-color: #cfe2ff;
+    }
+    
+    .timer {
+        font-family: monospace;
+        font-size: 1.2rem;
+    }
+    
+    .order-actions {
+        opacity: 0.7;
+        transition: opacity 0.3s ease;
+    }
+    
+    .order-card:hover .order-actions {
+        opacity: 1;
+    }
+    
+    @media (min-width: 992px) {
+        .orders-container {
+            height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>
+                    <i class="fas fa-utensils me-2"></i>Kitchen Display
+                </h2>
+                <div>
+                    <button onclick="toggleAutoRefresh()" class="btn btn-outline-primary me-2" id="refreshToggle">
+                        <i class="fas fa-sync-alt me-2"></i>Auto Refresh: ON
+                    </button>
+                    <button onclick="refreshOrders()" class="btn btn-primary">
+                        <i class="fas fa-sync me-2"></i>Refresh Now
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Status Summary -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-clock me-2"></i>Pending
+                    </h5>
+                    <h2 id="pending-count">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-spinner me-2"></i>In Progress
+                    </h5>
+                    <h2 id="in-progress-count">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-check-circle me-2"></i>Completed Today
+                    </h5>
+                    <h2 id="completed-count">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-exclamation-circle me-2"></i>High Priority
+                    </h5>
+                    <h2 id="high-priority-count">0</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders Grid -->
+    <div class="row g-4 orders-container" id="ordersContainer">
+        {% for kot in kots %}
+        <div class="col-lg-4 col-xl-3" id="kot-{{ kot.id }}">
+            <div class="card order-card shadow-sm priority-{{ kot.priority }} status-{{ kot.status }}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        KOT #{{ kot.kot_number }}
+                    </h5>
+                    <span class="badge {% if kot.priority == 'high' %}bg-danger{% elif kot.priority == 'normal' %}bg-primary{% else %}bg-secondary{% endif %}">
+                        {{ kot.priority.upper() }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Table:</strong> {{ kot.billing_order.table_number }}<br>
+                        <strong>Time:</strong> <span class="timer" data-time="{{ kot.created_at.isoformat() }}">00:00</span>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th class="text-center">Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in kot.billing_order.items %}
+                                <tr>
+                                    <td>{{ item.item_name }}</td>
+                                    <td class="text-center">{{ item.quantity }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if kot.notes %}
+                    <div class="mt-3">
+                        <strong>Notes:</strong>
+                        <p class="mb-0 small">{{ kot.notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer order-actions">
+                    {% if kot.status == 'pending' %}
+                    <button onclick="updateStatus('{{ kot.id }}', 'in_progress')" class="btn btn-primary btn-sm w-100">
+                        <i class="fas fa-play me-2"></i>Start Preparing
+                    </button>
+                    {% elif kot.status == 'in_progress' %}
+                    <button onclick="updateStatus('{{ kot.id }}', 'completed')" class="btn btn-success btn-sm w-100">
+                        <i class="fas fa-check me-2"></i>Mark as Complete
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let autoRefresh = true;
+let refreshInterval;
+
+// Format time elapsed
+function formatElapsedTime(startTime) {
+    const elapsed = Math.floor((new Date() - new Date(startTime)) / 1000);
+    const hours = Math.floor(elapsed / 3600);
+    const minutes = Math.floor((elapsed % 3600) / 60);
+    const seconds = elapsed % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+// Update all timers
+function updateTimers() {
+    document.querySelectorAll('.timer').forEach(timer => {
+        const startTime = timer.dataset.time;
+        timer.textContent = formatElapsedTime(startTime);
+    });
+}
+
+// Update order status
+function updateStatus(kotId, newStatus) {
+    fetch("{{ url_for('billing.update_kot_status') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `kot_id=${kotId}&status=${newStatus}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Remove the card if completed
+            if (newStatus === 'completed') {
+                document.getElementById(`kot-${kotId}`).remove();
+            } else {
+                refreshOrders(); // Refresh to update UI
+            }
+        } else {
+            alert('Error updating order status');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating order status');
+    });
+}
+
+// Refresh orders
+function refreshOrders() {
+    // Implement AJAX call to fetch updated orders
+    // This would typically call an endpoint that returns the current active orders
+    location.reload(); // For now, just reload the page
+}
+
+// Toggle auto-refresh
+function toggleAutoRefresh() {
+    autoRefresh = !autoRefresh;
+    const button = document.getElementById('refreshToggle');
+    
+    if (autoRefresh) {
+        button.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Auto Refresh: ON';
+        refreshInterval = setInterval(refreshOrders, 30000); // Refresh every 30 seconds
+    } else {
+        button.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Auto Refresh: OFF';
+        clearInterval(refreshInterval);
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    // Start timer updates
+    setInterval(updateTimers, 1000);
+    
+    // Start auto-refresh
+    refreshInterval = setInterval(refreshOrders, 30000);
+    
+    // Update counters
+    const pendingCount = document.querySelectorAll('.status-pending').length;
+    const inProgressCount = document.querySelectorAll('.status-in_progress').length;
+    const highPriorityCount = document.querySelectorAll('.priority-high').length;
+    
+    document.getElementById('pending-count').textContent = pendingCount;
+    document.getElementById('in-progress-count').textContent = inProgressCount;
+    document.getElementById('high-priority-count').textContent = highPriorityCount;
+});
+</script>
+{% endblock %}
