@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Records{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+    .filter-section {
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+    }
+    .payment-card {
+        transition: all 0.3s ease;
+    }
+    .payment-card:hover {
+        transform: translateY(-5px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>
+                    <i class="fas fa-money-check-alt me-2"></i>Payment Records
+                </h2>
+                <div>
+                    <button onclick="exportPayments()" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-file-export me-2"></i>Export Data
+                    </button>
+                    <a href="{{ url_for('vendor.add_payment') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Record Payment
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-section mb-4">
+        <form id="filterForm" class="row g-3">
+            <div class="col-md-3">
+                <label for="vendor" class="form-label">Vendor</label>
+                <select class="form-select" id="vendor" name="vendor">
+                    <option value="">All Vendors</option>
+                    {% for vendor in vendors %}
+                    <option value="{{ vendor.id }}" 
+                            {{ 'selected' if request.args.get('vendor') == vendor.id|string }}>
+                        {{ vendor.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="dateRange" class="form-label">Date Range</label>
+                <input type="text" class="form-control" id="dateRange" name="dateRange">
+            </div>
+            <div class="col-md-3">
+                <label for="paymentMethod" class="form-label">Payment Method</label>
+                <select class="form-select" id="paymentMethod" name="paymentMethod">
+                    <option value="">All Methods</option>
+                    <option value="cash">Cash</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="cheque">Cheque</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="status" class="form-label">Status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All Status</option>
+                    <option value="completed">Completed</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- Payment Summary -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Payments</h6>
+                    <h2 id="totalPayments">₹0.00</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Completed</h6>
+                    <h2 id="completedPayments">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <h6 class="card-title">Pending</h6>
+                    <h2 id="pendingPayments">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Failed</h6>
+                    <h2 id="failedPayments">0</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payments List -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Payment #</th>
+                            <th>Date</th>
+                            <th>Vendor</th>
+                            <th>Order #</th>
+                            <th>Amount</th>
+                            <th>Method</th>
+                            <th>Reference</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="paymentsTableBody">
+                        {% for payment in payments %}
+                        <tr>
+                            <td>{{ payment.payment_number }}</td>
+                            <td>{{ payment.payment_date.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                <a href="{{ url_for('vendor.vendor_details', vendor_id=payment.vendor.id) }}">
+                                    {{ payment.vendor.name }}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('vendor.order_details', order_id=payment.order.id) }}">
+                                    {{ payment.order.order_number }}
+                                </a>
+                            </td>
+                            <td>₹{{ "%.2f"|format(payment.amount) }}</td>
+                            <td>{{ payment.payment_method.replace('_', ' ').title() }}</td>
+                            <td>{{ payment.reference_number or '-' }}</td>
+                            <td>
+                                <span class="badge bg-{{ 
+                                    'success' if payment.status == 'completed'
+                                    else 'warning' if payment.status == 'pending'
+                                    else 'danger' 
+                                }}">
+                                    {{ payment.status.upper() }}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" 
+                                        onclick="viewPaymentDetails('{{ payment.id }}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Details Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Payment Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="paymentModalBody">
+                Loading...
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+// Initialize date range picker
+flatpickr("#dateRange", {
+    mode: "range",
+    dateFormat: "Y-m-d",
+    defaultDate: [
+        new Date().setDate(new Date().getDate() - 30),
+        new Date()
+    ]
+});
+
+// Update payment statistics
+function updateStatistics(payments) {
+    const total = payments.reduce((sum, p) => sum + p.amount, 0);
+    const completed = payments.filter(p => p.status === 'completed').length;
+    const pending = payments.filter(p => p.status === 'pending').length;
+    const failed = payments.filter(p => p.status === 'failed').length;
+    
+    document.getElementById('totalPayments').textContent = `₹${total.toFixed(2)}`;
+    document.getElementById('completedPayments').textContent = completed;
+    document.getElementById('pendingPayments').textContent = pending;
+    document.getElementById('failedPayments').textContent = failed;
+}
+
+// Load payments based on filters
+function loadPayments() {
+    const params = new URLSearchParams(new FormData(document.getElementById('filterForm')));
+    
+    fetch(`/vendor/api/payments?${params}`)
+        .then(response => response.json())
+        .then(payments => {
+            updateStatistics(payments);
+            
+            const tbody = document.getElementById('paymentsTableBody');
+            tbody.innerHTML = payments.map(payment => `
+                <tr>
+                    <td>${payment.payment_number}</td>
+                    <td>${new Date(payment.payment_date).toLocaleDateString()}</td>
+                    <td>
+                        <a href="/vendor/vendors/${payment.vendor_id}">
+                            ${payment.vendor_name}
+                        </a>
+                    </td>
+                    <td>
+                        <a href="/vendor/orders/${payment.order_id}">
+                            ${payment.order_number}
+                        </a>
+                    </td>
+                    <td>₹${payment.amount.toFixed(2)}</td>
+                    <td>${payment.payment_method.replace('_', ' ').title()}</td>
+                    <td>${payment.reference_number || '-'}</td>
+                    <td>
+                        <span class="badge bg-${
+                            payment.status === 'completed' ? 'success' :
+                            payment.status === 'pending' ? 'warning' : 'danger'
+                        }">
+                            ${payment.status.toUpperCase()}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" 
+                                onclick="viewPaymentDetails('${payment.id}')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('') || `
+                <tr>
+                    <td colspan="9" class="text-center">No payments found</td>
+                </tr>
+            `;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading payments');
+        });
+}
+
+// View payment details
+function viewPaymentDetails(paymentId) {
+    const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
+    
+    fetch(`/vendor/api/payments/${paymentId}`)
+        .then(response => response.json())
+        .then(payment => {
+            document.getElementById('paymentModalBody').innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Payment Number:</strong> ${payment.payment_number}</p>
+                        <p><strong>Date:</strong> ${new Date(payment.payment_date).toLocaleDateString()}</p>
+                        <p><strong>Amount:</strong> ₹${payment.amount.toFixed(2)}</p>
+                        <p><strong>Method:</strong> ${payment.payment_method.replace('_', ' ').title()}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Status:</strong> ${payment.status.toUpperCase()}</p>
+                        <p><strong>Reference:</strong> ${payment.reference_number || '-'}</p>
+                        <p><strong>Created:</strong> ${new Date(payment.created_at).toLocaleString()}</p>
+                    </div>
+                </div>
+                ${payment.notes ? `
+                    <div class="mt-3">
+                        <h6>Notes:</h6>
+                        <p class="mb-0">${payment.notes}</p>
+                    </div>
+                ` : ''}
+            `;
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading payment details');
+        });
+}
+
+// Export payments
+function exportPayments() {
+    const params = new URLSearchParams(new FormData(document.getElementById('filterForm')));
+    window.location.href = `/vendor/api/payments/export?${params}`;
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    // Load initial data
+    loadPayments();
+    
+    // Set up filter change handlers
+    document.querySelectorAll('#filterForm select').forEach(select => {
+        select.addEventListener('change', loadPayments);
+    });
+    
+    document.getElementById('dateRange').addEventListener('change', loadPayments);
+});
+</script>
+{% endblock %}
