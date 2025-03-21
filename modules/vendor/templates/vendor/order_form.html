@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}Create Purchase Order{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+    .item-row {
+        transition: all 0.3s ease;
+    }
+    .item-row:hover {
+        background-color: #f8f9fa;
+    }
+    .remove-item {
+        transition: all 0.2s ease;
+    }
+    .remove-item:hover {
+        transform: scale(1.1);
+    }
+    .selected-items {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .total-section {
+        font-size: 1.2rem;
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>
+                <i class="fas fa-file-alt me-2"></i>Create Purchase Order
+            </h2>
+        </div>
+    </div>
+
+    <form id="orderForm" method="POST" action="{{ url_for('vendor.add_order') }}" class="needs-validation" novalidate>
+        <div class="row g-4">
+            <!-- Order Details -->
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Order Details
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="vendor_id" class="form-label">Select Vendor</label>
+                            <select class="form-select" id="vendor_id" name="vendor_id" required>
+                                <option value="">Choose a vendor...</option>
+                                {% for vendor in vendors %}
+                                <option value="{{ vendor.id }}" 
+                                        data-payment-terms="{{ vendor.payment_terms }}">
+                                    {{ vendor.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="invalid-feedback">
+                                Please select a vendor.
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="expected_delivery_date" class="form-label">Expected Delivery Date</label>
+                            <input type="text" class="form-control" id="expected_delivery_date" 
+                                   name="expected_delivery_date" required>
+                            <div class="invalid-feedback">
+                                Please select an expected delivery date.
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="payment_terms" class="form-label">Payment Terms</label>
+                            <input type="text" class="form-control" id="payment_terms" readonly>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notes</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Items -->
+            <div class="col-md-8">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-list me-2"></i>Order Items
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Item Search -->
+                        <div class="mb-4">
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="itemSearch" 
+                                       placeholder="Search items...">
+                                <button class="btn btn-outline-secondary" type="button" 
+                                        data-bs-toggle="modal" data-bs-target="#itemsModal">
+                                    <i class="fas fa-search me-2"></i>Browse Items
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Selected Items -->
+                        <div class="selected-items mb-4">
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Item</th>
+                                            <th>Current Stock</th>
+                                            <th>Quantity</th>
+                                            <th>Unit Price</th>
+                                            <th>Total</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="selectedItems">
+                                        <!-- Selected items will be added here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Total Section -->
+                        <div class="total-section p-3">
+                            <div class="row align-items-center">
+                                <div class="col">
+                                    <h5 class="mb-0">Total Amount:</h5>
+                                </div>
+                                <div class="col-auto">
+                                    <h5 class="mb-0" id="totalAmount">₹0.00</h5>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-save me-2"></i>Create Order
+                    </button>
+                    <a href="{{ url_for('vendor.orders') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times me-2"></i>Cancel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Items Modal -->
+<div class="modal fade" id="itemsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Items</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table" id="itemsTable">
+                        <thead>
+                            <tr>
+                                <th>Item Name</th>
+                                <th>Category</th>
+                                <th>Current Stock</th>
+                                <th>Unit</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr class="item-row">
+                                <td>{{ item.name }}</td>
+                                <td>{{ item.category }}</td>
+                                <td>{{ item.current_stock }}</td>
+                                <td>{{ item.unit }}</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                            onclick="addItem('{{ item.id }}', '{{ item.name }}', 
+                                                          '{{ item.current_stock }}', '{{ item.unit }}')">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+// Initialize date picker
+flatpickr("#expected_delivery_date", {
+    minDate: "today",
+    dateFormat: "Y-m-d"
+});
+
+// Update payment terms when vendor changes
+document.getElementById('vendor_id').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    document.getElementById('payment_terms').value = 
+        selectedOption.dataset.paymentTerms || 'Not specified';
+});
+
+// Add item to order
+function addItem(itemId, itemName, currentStock, unit) {
+    const tbody = document.getElementById('selectedItems');
+    const row = document.createElement('tr');
+    row.className = 'item-row';
+    row.innerHTML = `
+        <td>
+            ${itemName}
+            <input type="hidden" name="items[]" value="${itemId}">
+        </td>
+        <td>${currentStock} ${unit}</td>
+        <td>
+            <input type="number" class="form-control form-control-sm quantity" 
+                   name="quantities[]" min="1" required style="width: 100px"
+                   onchange="calculateTotal(this)">
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm price" 
+                   name="prices[]" min="0.01" step="0.01" required style="width: 100px"
+                   onchange="calculateTotal(this)">
+        </td>
+        <td class="item-total">₹0.00</td>
+        <td>
+            <button type="button" class="btn btn-danger btn-sm remove-item" 
+                    onclick="removeItem(this)">
+                <i class="fas fa-times"></i>
+            </button>
+        </td>
+    `;
+    tbody.appendChild(row);
+    
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('itemsModal'));
+    modal.hide();
+}
+
+// Remove item from order
+function removeItem(button) {
+    button.closest('tr').remove();
+    updateTotalAmount();
+}
+
+// Calculate item total
+function calculateTotal(input) {
+    const row = input.closest('tr');
+    const quantity = parseFloat(row.querySelector('.quantity').value) || 0;
+    const price = parseFloat(row.querySelector('.price').value) || 0;
+    const total = quantity * price;
+    row.querySelector('.item-total').textContent = `₹${total.toFixed(2)}`;
+    updateTotalAmount();
+}
+
+// Update total amount
+function updateTotalAmount() {
+    const totals = Array.from(document.querySelectorAll('.item-total'))
+        .map(el => parseFloat(el.textContent.replace('₹', '')) || 0);
+    const total = totals.reduce((sum, val) => sum + val, 0);
+    document.getElementById('totalAmount').textContent = `₹${total.toFixed(2)}`;
+}
+
+// Filter items in modal
+document.getElementById('itemSearch').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    document.querySelectorAll('#itemsTable .item-row').forEach(row => {
+        const itemName = row.cells[0].textContent.toLowerCase();
+        const category = row.cells[1].textContent.toLowerCase();
+        row.style.display = 
+            itemName.includes(searchTerm) || category.includes(searchTerm) ? '' : 'none';
+    });
+});
+
+// Form validation
+document.getElementById('orderForm').addEventListener('submit', function(e) {
+    if (!this.checkValidity()) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    const items = document.querySelectorAll('#selectedItems tr');
+    if (items.length === 0) {
+        e.preventDefault();
+        alert('Please add at least one item to the order.');
+        return;
+    }
+    
+    this.classList.add('was-validated');
+});
+</script>
+{% endblock %}
