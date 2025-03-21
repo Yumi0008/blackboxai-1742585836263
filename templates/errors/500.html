@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}500 - Internal Server Error{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 text-center">
+        <div class="error-template">
+            <h1 class="display-1 text-muted">
+                <i class="fas fa-bug"></i>
+            </h1>
+            <h2 class="display-4">500</h2>
+            <h3 class="mb-4">Internal Server Error</h3>
+            <div class="error-details mb-4">
+                Sorry, something went wrong on our end. Our team has been notified and we're working to fix the issue.
+            </div>
+            <div class="error-actions">
+                <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg me-3">
+                    <i class="fas fa-home me-2"></i>Back to Home
+                </a>
+                <a href="#" onclick="window.location.reload()" class="btn btn-outline-secondary btn-lg">
+                    <i class="fas fa-sync-alt me-2"></i>Try Again
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
