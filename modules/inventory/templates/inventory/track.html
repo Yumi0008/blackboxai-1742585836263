@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+
+{% block title %}Track Inventory{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stock-card {
+        transition: all 0.3s ease;
+    }
+    .stock-card:hover {
+        transform: translateY(-5px);
+    }
+    .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+    }
+    .status-active {
+        background-color: #28a745;
+    }
+    .status-low {
+        background-color: #ffc107;
+    }
+    .status-out {
+        background-color: #dc3545;
+    }
+    .filter-section {
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+    }
+    .transaction-history {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>
+                    <i class="fas fa-boxes me-2"></i>Track Inventory
+                </h2>
+                <div>
+                    <button onclick="exportInventory()" class="btn btn-outline-primary">
+                        <i class="fas fa-file-export me-2"></i>Export Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-section mb-4">
+        <form id="filterForm" class="row g-3">
+            <div class="col-md-4">
+                <label for="search" class="form-label">Search Items</label>
+                <input type="text" class="form-control" id="search" name="search" 
+                       placeholder="Search by name..." value="{{ request.args.get('search', '') }}">
+            </div>
+            <div class="col-md-3">
+                <label for="category" class="form-label">Category</label>
+                <select class="form-select" id="category" name="category">
+                    <option value="">All Categories</option>
+                    {% for category in categories %}
+                    <option value="{{ category[0] }}" 
+                            {{ 'selected' if request.args.get('category') == category[0] }}>
+                        {{ category[0] }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="status" class="form-label">Status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All Status</option>
+                    <option value="active" {{ 'selected' if request.args.get('status') == 'active' }}>Active</option>
+                    <option value="low_stock" {{ 'selected' if request.args.get('status') == 'low_stock' }}>Low Stock</option>
+                    <option value="out_of_stock" {{ 'selected' if request.args.get('status') == 'out_of_stock' }}>Out of Stock</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-filter me-2"></i>Apply Filters
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Inventory Grid -->
+    <div class="row g-4">
+        {% for item in items %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card stock-card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <span class="status-indicator status-{{ 
+                            'active' if item.status == 'active' 
+                            else 'low' if item.status == 'low_stock' 
+                            else 'out' 
+                        }}"></span>
+                        {{ item.name }}
+                    </h5>
+                    <button class="btn btn-sm btn-outline-primary" 
+                            onclick="viewDetails('{{ item.id }}')">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col">
+                            <small class="text-muted">Category</small>
+                            <div>{{ item.category }}</div>
+                        </div>
+                        <div class="col">
+                            <small class="text-muted">Unit</small>
+                            <div>{{ item.unit }}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress mb-3" style="height: 20px;">
+                        {% with %}
+                            {% set stock_percentage = (item.current_stock / item.maximum_stock * 100) if item.maximum_stock > 0 else 0 %}
+                            {% set bar_color = 'success' if stock_percentage >= 50 else 'warning' if stock_percentage >= 20 else 'danger' %}
+                            <div class="progress-bar bg-{{ bar_color }}"
+                                 role="progressbar" 
+                                 style="width: {{ stock_percentage }}%">
+                                {{ "%.1f"|format(stock_percentage) }}%
+                            </div>
+                        {% endwith %}
+                    </div>
+                    
+                    <div class="row text-center">
+                        <div class="col">
+                            <small class="text-muted d-block">Current Stock</small>
+                            <strong>{{ item.current_stock }} {{ item.unit }}</strong>
+                        </div>
+                        <div class="col">
+                            <small class="text-muted d-block">Minimum</small>
+                            <strong>{{ item.minimum_stock }} {{ item.unit }}</strong>
+                        </div>
+                        <div class="col">
+                            <small class="text-muted d-block">Maximum</small>
+                            <strong>{{ item.maximum_stock }} {{ item.unit }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Item Details Modal -->
+<div class="modal fade" id="itemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Item Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="itemDetails">Loading...</div>
+                
+                <h6 class="mt-4 mb-3">Transaction History</h6>
+                <div class="transaction-history">
+                    <div class="table-responsive">
+                        <table class="table table-sm" id="transactionTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Quantity</th>
+                                    <th>Reference</th>
+                                    <th>Created By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Transactions will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function viewDetails(itemId) {
+    const modal = new bootstrap.Modal(document.getElementById('itemModal'));
+    
+    // Load item details
+    fetch(`/inventory/api/items?item_id=${itemId}`)
+        .then(response => response.json())
+        .then(data => {
+            const item = data[0];
+            document.getElementById('itemDetails').innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tr>
+                                <th width="150">Name:</th>
+                                <td>${item.name}</td>
+                            </tr>
+                            <tr>
+                                <th>Category:</th>
+                                <td>${item.category}</td>
+                            </tr>
+                            <tr>
+                                <th>Unit:</th>
+                                <td>${item.unit}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tr>
+                                <th width="150">Current Stock:</th>
+                                <td>${item.current_stock} ${item.unit}</td>
+                            </tr>
+                            <tr>
+                                <th>Status:</th>
+                                <td>
+                                    <span class="badge bg-${
+                                        item.status === 'active' ? 'success' :
+                                        item.status === 'low_stock' ? 'warning' : 'danger'
+                                    }">
+                                        ${item.status.replace('_', ' ').toUpperCase()}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Last Updated:</th>
+                                <td>${new Date(item.updated_at).toLocaleString()}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            // Load transactions
+            return fetch(`/inventory/api/transactions?item_id=${itemId}`);
+        })
+        .then(response => response.json())
+        .then(transactions => {
+            const tbody = document.querySelector('#transactionTable tbody');
+            tbody.innerHTML = transactions.map(txn => `
+                <tr>
+                    <td>${new Date(txn.created_at).toLocaleString()}</td>
+                    <td>
+                        <span class="badge bg-${
+                            txn.transaction_type === 'in' ? 'success' :
+                            txn.transaction_type === 'out' ? 'danger' : 'warning'
+                        }">
+                            ${txn.transaction_type.toUpperCase()}
+                        </span>
+                    </td>
+                    <td>${txn.quantity}</td>
+                    <td>${txn.reference_number || '-'}</td>
+                    <td>${txn.created_by}</td>
+                </tr>
+            `).join('');
+            
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading item details');
+        });
+}
+
+function exportInventory() {
+    // Get current filter parameters
+    const params = new URLSearchParams(window.location.search);
+    
+    // Create CSV content
+    const headers = ['Name', 'Category', 'Current Stock', 'Unit', 'Status', 'Last Updated'];
+    let csv = headers.join(',') + '\n';
+    
+    fetch(`/inventory/api/items${params ? '?' + params : ''}`)
+        .then(response => response.json())
+        .then(items => {
+            items.forEach(item => {
+                csv += [
+                    item.name,
+                    item.category,
+                    item.current_stock,
+                    item.unit,
+                    item.status,
+                    new Date(item.updated_at).toLocaleString()
+                ].map(field => `"${field}"`).join(',') + '\n';
+            });
+            
+            // Create and trigger download
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'inventory_report.csv');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error exporting inventory data');
+        });
+}
+
+// Auto-submit form when filters change
+document.querySelectorAll('#filterForm select').forEach(select => {
+    select.addEventListener('change', () => document.getElementById('filterForm').submit());
+});
+
+// Debounce search input
+let searchTimeout;
+document.getElementById('search').addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        document.getElementById('filterForm').submit();
+    }, 500);
+});
+</script>
+{% endblock %}
