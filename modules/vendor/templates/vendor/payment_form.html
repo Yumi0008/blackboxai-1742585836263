@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Record Payment{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+    .payment-info {
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1rem;
+    }
+    .order-details {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>
+                <i class="fas fa-money-bill-wave me-2"></i>Record Payment
+            </h2>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Payment Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="paymentForm" method="POST" action="{{ url_for('vendor.add_payment') }}" 
+                          class="needs-validation" novalidate>
+                        
+                        <!-- Vendor Selection -->
+                        <div class="mb-4">
+                            <label for="vendor_id" class="form-label">Select Vendor</label>
+                            <select class="form-select" id="vendor_id" name="vendor_id" required
+                                    onchange="loadVendorOrders(this.value)">
+                                <option value="">Choose a vendor...</option>
+                                {% for vendor in vendors %}
+                                <option value="{{ vendor.id }}">{{ vendor.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="invalid-feedback">
+                                Please select a vendor.
+                            </div>
+                        </div>
+
+                        <!-- Order Selection -->
+                        <div class="mb-4">
+                            <label for="order_id" class="form-label">Select Order</label>
+                            <select class="form-select" id="order_id" name="order_id" required
+                                    onchange="loadOrderDetails(this.value)">
+                                <option value="">Choose an order...</option>
+                            </select>
+                            <div class="invalid-feedback">
+                                Please select an order.
+                            </div>
+                        </div>
+
+                        <!-- Order Details -->
+                        <div id="orderDetails" class="payment-info mb-4" style="display: none;">
+                            <h6 class="mb-3">Order Details</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1">
+                                        <strong>Order Number:</strong>
+                                        <span id="orderNumber"></span>
+                                    </p>
+                                    <p class="mb-1">
+                                        <strong>Order Date:</strong>
+                                        <span id="orderDate"></span>
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-1">
+                                        <strong>Total Amount:</strong>
+                                        <span id="orderAmount"></span>
+                                    </p>
+                                    <p class="mb-1">
+                                        <strong>Balance Due:</strong>
+                                        <span id="balanceDue"></span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payment Details -->
+                        <div class="mb-4">
+                            <h6 class="mb-3">Payment Details</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="payment_date" class="form-label">Payment Date</label>
+                                    <input type="text" class="form-control" id="payment_date" 
+                                           name="payment_date" required>
+                                    <div class="invalid-feedback">
+                                        Please select a payment date.
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="amount" class="form-label">Amount</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">₹</span>
+                                        <input type="number" class="form-control" id="amount" 
+                                               name="amount" min="0.01" step="0.01" required>
+                                    </div>
+                                    <div class="invalid-feedback">
+                                        Please enter a valid amount.
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="payment_method" class="form-label">Payment Method</label>
+                                    <select class="form-select" id="payment_method" name="payment_method" required>
+                                        <option value="">Select method...</option>
+                                        <option value="cash">Cash</option>
+                                        <option value="bank_transfer">Bank Transfer</option>
+                                        <option value="cheque">Cheque</option>
+                                    </select>
+                                    <div class="invalid-feedback">
+                                        Please select a payment method.
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="reference_number" class="form-label">Reference Number</label>
+                                    <input type="text" class="form-control" id="reference_number" 
+                                           name="reference_number" placeholder="Cheque/Transaction ID">
+                                </div>
+                                <div class="col-12">
+                                    <label for="notes" class="form-label">Notes</label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Record Payment
+                            </button>
+                            <a href="{{ url_for('vendor.payments') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+// Initialize date picker
+flatpickr("#payment_date", {
+    defaultDate: "today",
+    dateFormat: "Y-m-d"
+});
+
+// Load vendor's orders
+function loadVendorOrders(vendorId) {
+    if (!vendorId) return;
+    
+    const orderSelect = document.getElementById('order_id');
+    orderSelect.innerHTML = '<option value="">Loading orders...</option>';
+    
+    fetch(`/vendor/api/orders?vendor_id=${vendorId}&status=received`)
+        .then(response => response.json())
+        .then(orders => {
+            orderSelect.innerHTML = '<option value="">Choose an order...</option>';
+            orders.filter(order => order.payment_status !== 'paid')
+                  .forEach(order => {
+                      orderSelect.innerHTML += `
+                          <option value="${order.id}" 
+                                  data-amount="${order.total_amount}"
+                                  data-number="${order.order_number}"
+                                  data-date="${order.created_at}"
+                                  data-paid="${order.payments.reduce((sum, p) => sum + p.amount, 0)}">
+                              ${order.order_number} (Balance: ₹${(
+                                  order.total_amount - 
+                                  order.payments.reduce((sum, p) => sum + p.amount, 0)
+                              ).toFixed(2)})
+                          </option>
+                      `;
+                  });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            orderSelect.innerHTML = '<option value="">Error loading orders</option>';
+        });
+}
+
+// Load order details
+function loadOrderDetails(orderId) {
+    const orderDetails = document.getElementById('orderDetails');
+    if (!orderId) {
+        orderDetails.style.display = 'none';
+        return;
+    }
+    
+    const option = document.querySelector(`#order_id option[value="${orderId}"]`);
+    const totalAmount = parseFloat(option.dataset.amount);
+    const paidAmount = parseFloat(option.dataset.paid);
+    const balanceDue = totalAmount - paidAmount;
+    
+    document.getElementById('orderNumber').textContent = option.dataset.number;
+    document.getElementById('orderDate').textContent = 
+        new Date(option.dataset.date).toLocaleDateString();
+    document.getElementById('orderAmount').textContent = `₹${totalAmount.toFixed(2)}`;
+    document.getElementById('balanceDue').textContent = `₹${balanceDue.toFixed(2)}`;
+    
+    // Set maximum payment amount
+    document.getElementById('amount').max = balanceDue;
+    document.getElementById('amount').value = balanceDue;
+    
+    orderDetails.style.display = 'block';
+}
+
+// Form validation
+document.getElementById('paymentForm').addEventListener('submit', function(e) {
+    if (!this.checkValidity()) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    const amount = parseFloat(document.getElementById('amount').value);
+    const balanceDue = parseFloat(document.getElementById('balanceDue')
+        .textContent.replace('₹', ''));
+    
+    if (amount > balanceDue) {
+        e.preventDefault();
+        alert('Payment amount cannot exceed the balance due.');
+        return;
+    }
+    
+    this.classList.add('was-validated');
+});
+
+// Initialize with URL parameters if any
+const urlParams = new URLSearchParams(window.location.search);
+const vendorId = urlParams.get('vendor_id');
+const orderId = urlParams.get('order_id');
+
+if (vendorId) {
+    document.getElementById('vendor_id').value = vendorId;
+    loadVendorOrders(vendorId);
+    if (orderId) {
+        setTimeout(() => {
+            document.getElementById('order_id').value = orderId;
+            loadOrderDetails(orderId);
+        }, 500);
+    }
+}
+</script>
+{% endblock %}
