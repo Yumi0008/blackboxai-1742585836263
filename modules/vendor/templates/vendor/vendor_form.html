@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}{% if vendor %}Edit{% else %}Add{% endif %} Vendor{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>
+                <i class="fas fa-user-plus me-2"></i>{% if vendor %}Edit{% else %}Add{% endif %} Vendor
+            </h2>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Vendor Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="vendorForm" method="POST" class="needs-validation" novalidate>
+                        <!-- Basic Information -->
+                        <div class="mb-4">
+                            <h6 class="mb-3">Basic Information</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="name" class="form-label">Vendor Name</label>
+                                    <input type="text" class="form-control" id="name" name="name"
+                                           value="{{ vendor.name if vendor else '' }}" required>
+                                    <div class="invalid-feedback">
+                                        Please provide a vendor name.
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="contact_person" class="form-label">Contact Person</label>
+                                    <input type="text" class="form-control" id="contact_person" name="contact_person"
+                                           value="{{ vendor.contact_person if vendor else '' }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Contact Information -->
+                        <div class="mb-4">
+                            <h6 class="mb-3">Contact Information</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="email" class="form-label">Email Address</label>
+                                    <input type="email" class="form-control" id="email" name="email"
+                                           value="{{ vendor.email if vendor else '' }}">
+                                    <div class="invalid-feedback">
+                                        Please provide a valid email address.
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="phone" class="form-label">Phone Number</label>
+                                    <input type="tel" class="form-control" id="phone" name="phone"
+                                           value="{{ vendor.phone if vendor else '' }}">
+                                </div>
+                                <div class="col-12">
+                                    <label for="address" class="form-label">Address</label>
+                                    <textarea class="form-control" id="address" name="address" 
+                                              rows="3">{{ vendor.address if vendor else '' }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Business Information -->
+                        <div class="mb-4">
+                            <h6 class="mb-3">Business Information</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="gst_number" class="form-label">GST Number</label>
+                                    <input type="text" class="form-control" id="gst_number" name="gst_number"
+                                           value="{{ vendor.gst_number if vendor else '' }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="payment_terms" class="form-label">Payment Terms</label>
+                                    <select class="form-select" id="payment_terms" name="payment_terms">
+                                        <option value="">Select Payment Terms</option>
+                                        <option value="COD" 
+                                                {{ 'selected' if vendor and vendor.payment_terms == 'COD' }}>
+                                            Cash on Delivery
+                                        </option>
+                                        <option value="Net 15" 
+                                                {{ 'selected' if vendor and vendor.payment_terms == 'Net 15' }}>
+                                            Net 15 Days
+                                        </option>
+                                        <option value="Net 30" 
+                                                {{ 'selected' if vendor and vendor.payment_terms == 'Net 30' }}>
+                                            Net 30 Days
+                                        </option>
+                                        <option value="Net 45" 
+                                                {{ 'selected' if vendor and vendor.payment_terms == 'Net 45' }}>
+                                            Net 45 Days
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Additional Information -->
+                        <div class="mb-4">
+                            <h6 class="mb-3">Additional Information</h6>
+                            <div class="mb-3">
+                                <label for="notes" class="form-label">Notes</label>
+                                <textarea class="form-control" id="notes" name="notes" 
+                                          rows="3">{{ vendor.notes if vendor else '' }}</textarea>
+                            </div>
+                        </div>
+
+                        <!-- Form Actions -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Save Vendor
+                            </button>
+                            <a href="{{ url_for('vendor.vendors') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Form validation
+(function () {
+    'use strict'
+
+    // Fetch all forms we want to apply custom validation styles to
+    const forms = document.querySelectorAll('.needs-validation');
+
+    // Loop over them and prevent submission
+    Array.from(forms).forEach(form => {
+        form.addEventListener('submit', event => {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        }, false);
+    });
+})();
+
+// Phone number formatting
+document.getElementById('phone').addEventListener('input', function(e) {
+    let x = e.target.value.replace(/\D/g, '').match(/(\d{0,3})(\d{0,3})(\d{0,4})/);
+    e.target.value = !x[2] ? x[1] : !x[3] ? x[1] + '-' + x[2] : x[1] + '-' + x[2] + '-' + x[3];
+});
+
+// GST number formatting
+document.getElementById('gst_number').addEventListener('input', function(e) {
+    e.target.value = e.target.value.toUpperCase();
+});
+
+// Email validation
+document.getElementById('email').addEventListener('input', function(e) {
+    if (e.target.value) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(e.target.value)) {
+            e.target.setCustomValidity('Please enter a valid email address');
+        } else {
+            e.target.setCustomValidity('');
+        }
+    } else {
+        e.target.setCustomValidity('');
+    }
+});
+</script>
+{% endblock %}
