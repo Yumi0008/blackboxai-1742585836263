@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+
+{% block title %}Vendor Details - {{ vendor.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>
+                    <i class="fas fa-user me-2"></i>Vendor Details
+                </h2>
+                <div>
+                    <a href="{{ url_for('vendor.add_order', vendor_id=vendor.id) }}" 
+                       class="btn btn-success me-2">
+                        <i class="fas fa-file-alt me-2"></i>New Order
+                    </a>
+                    <a href="{{ url_for('vendor.add_payment', vendor_id=vendor.id) }}" 
+                       class="btn btn-info me-2">
+                        <i class="fas fa-money-bill-wave me-2"></i>Add Payment
+                    </a>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-primary dropdown-toggle" 
+                                data-bs-toggle="dropdown">
+                            <i class="fas fa-cog me-2"></i>Actions
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('vendor.edit_vendor', vendor_id=vendor.id) }}">
+                                    <i class="fas fa-edit me-2"></i>Edit Vendor
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="#" onclick="toggleVendorStatus()">
+                                    {% if vendor.status == 'active' %}
+                                    <i class="fas fa-ban me-2"></i>Deactivate Vendor
+                                    {% else %}
+                                    <i class="fas fa-check-circle me-2"></i>Activate Vendor
+                                    {% endif %}
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item text-danger" href="#" 
+                                   onclick="exportVendorData()">
+                                    <i class="fas fa-file-export me-2"></i>Export Data
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Vendor Information -->
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Basic Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4 text-center">
+                        <span class="badge bg-{{ 'success' if vendor.status == 'active' else 'danger' }} mb-2">
+                            {{ vendor.status.upper() }}
+                        </span>
+                        <h4>{{ vendor.name }}</h4>
+                        <p class="text-muted mb-0">Vendor since {{ vendor.created_at.strftime('%B %Y') }}</p>
+                    </div>
+                    <hr>
+                    <table class="table table-sm">
+                        <tr>
+                            <th width="130">Contact Person:</th>
+                            <td>{{ vendor.contact_person or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Email:</th>
+                            <td>
+                                {% if vendor.email %}
+                                <a href="mailto:{{ vendor.email }}">{{ vendor.email }}</a>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Phone:</th>
+                            <td>
+                                {% if vendor.phone %}
+                                <a href="tel:{{ vendor.phone }}">{{ vendor.phone }}</a>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>GST Number:</th>
+                            <td>{{ vendor.gst_number or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Payment Terms:</th>
+                            <td>{{ vendor.payment_terms or '-' }}</td>
+                        </tr>
+                    </table>
+                    {% if vendor.address %}
+                    <div class="mt-3">
+                        <h6>Address:</h6>
+                        <p class="mb-0">{{ vendor.address }}</p>
+                    </div>
+                    {% endif %}
+                    {% if vendor.notes %}
+                    <div class="mt-3">
+                        <h6>Notes:</h6>
+                        <p class="mb-0">{{ vendor.notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Summary -->
+        <div class="col-md-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line me-2"></i>Order Summary
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Total Orders</h6>
+                                    <h2 id="totalOrders">-</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Pending Orders</h6>
+                                    <h2 id="pendingOrders">-</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Total Amount</h6>
+                                    <h2 id="totalAmount">-</h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Orders -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history me-2"></i>Recent Orders
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table" id="recentOrdersTable">
+                            <thead>
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Payment</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="6" class="text-center">Loading orders...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment History -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-money-check-alt me-2"></i>Payment History
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table" id="paymentsTable">
+                            <thead>
+                                <tr>
+                                    <th>Payment #</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Reference</th>
+                                    <th>Status</th>
+                                    <th>Order #</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="7" class="text-center">Loading payments...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function loadVendorData() {
+    // Load orders
+    fetch(`/vendor/api/orders?vendor_id={{ vendor.id }}`)
+        .then(response => response.json())
+        .then(orders => {
+            // Update summary statistics
+            document.getElementById('totalOrders').textContent = orders.length;
+            document.getElementById('pendingOrders').textContent = 
+                orders.filter(o => o.status === 'placed' || o.status === 'confirmed').length;
+            document.getElementById('totalAmount').textContent = 
+                '₹' + orders.reduce((sum, o) => sum + o.total_amount, 0).toFixed(2);
+            
+            // Update recent orders table
+            const recentOrders = orders.slice(0, 5);
+            document.querySelector('#recentOrdersTable tbody').innerHTML = 
+                recentOrders.map(order => `
+                    <tr>
+                        <td>${order.order_number}</td>
+                        <td>${new Date(order.created_at).toLocaleDateString()}</td>
+                        <td>₹${order.total_amount.toFixed(2)}</td>
+                        <td>
+                            <span class="badge bg-${
+                                order.status === 'received' ? 'success' :
+                                order.status === 'placed' ? 'warning' :
+                                order.status === 'confirmed' ? 'info' :
+                                order.status === 'cancelled' ? 'danger' : 'secondary'
+                            }">
+                                ${order.status.toUpperCase()}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-${
+                                order.payment_status === 'paid' ? 'success' :
+                                order.payment_status === 'partial' ? 'warning' : 'danger'
+                            }">
+                                ${order.payment_status.toUpperCase()}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="/vendor/orders/${order.id}" 
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                `).join('');
+        })
+        .catch(error => {
+            console.error('Error loading orders:', error);
+        });
+    
+    // Load payments
+    fetch(`/vendor/api/payments?vendor_id={{ vendor.id }}`)
+        .then(response => response.json())
+        .then(payments => {
+            document.querySelector('#paymentsTable tbody').innerHTML = 
+                payments.map(payment => `
+                    <tr>
+                        <td>${payment.payment_number}</td>
+                        <td>${new Date(payment.payment_date).toLocaleDateString()}</td>
+                        <td>₹${payment.amount.toFixed(2)}</td>
+                        <td>${payment.payment_method}</td>
+                        <td>${payment.reference_number || '-'}</td>
+                        <td>
+                            <span class="badge bg-${
+                                payment.status === 'completed' ? 'success' :
+                                payment.status === 'pending' ? 'warning' : 'danger'
+                            }">
+                                ${payment.status.toUpperCase()}
+                            </span>
+                        </td>
+                        <td>${payment.order_id}</td>
+                    </tr>
+                `).join('') || `
+                    <tr>
+                        <td colspan="7" class="text-center">No payments found</td>
+                    </tr>
+                `;
+        })
+        .catch(error => {
+            console.error('Error loading payments:', error);
+        });
+}
+
+function toggleVendorStatus() {
+    if (confirm('Are you sure you want to change the vendor status?')) {
+        const newStatus = '{{ vendor.status }}' === 'active' ? 'inactive' : 'active';
+        fetch(`/vendor/api/vendors/{{ vendor.id }}/status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Error updating vendor status');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating vendor status');
+        });
+    }
+}
+
+function exportVendorData() {
+    window.location.href = `/vendor/api/vendors/{{ vendor.id }}/export`;
+}
+
+// Load data when page loads
+document.addEventListener('DOMContentLoaded', loadVendorData);
+</script>
+{% endblock %}
