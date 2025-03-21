@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}KOT Details - {{ kot.kot_number }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>
+                    <i class="fas fa-file-alt me-2"></i>KOT Details
+                </h2>
+                <div>
+                    <button onclick="window.print()" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-print me-2"></i>Print KOT
+                    </button>
+                    <a href="{{ url_for('inventory.kot') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-plus me-2"></i>New KOT
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KOT Information -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-info-circle me-2"></i>KOT Information
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <table class="table table-sm">
+                        <tr>
+                            <th width="150">KOT Number:</th>
+                            <td>{{ kot.kot_number }}</td>
+                        </tr>
+                        <tr>
+                            <th>Status:</th>
+                            <td>
+                                <span class="badge bg-{{ 
+                                    'success' if kot.status == 'completed'
+                                    else 'warning' if kot.status == 'pending'
+                                    else 'danger' if kot.status == 'rejected'
+                                    else 'primary' 
+                                }}">
+                                    {{ kot.status.upper() }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Priority:</th>
+                            <td>
+                                <span class="badge bg-{{ 
+                                    'danger' if kot.priority == 'high'
+                                    else 'primary' if kot.priority == 'normal'
+                                    else 'secondary' 
+                                }}">
+                                    {{ kot.priority.upper() }}
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <table class="table table-sm">
+                        <tr>
+                            <th width="150">Requested By:</th>
+                            <td>{{ kot.requested_by }}</td>
+                        </tr>
+                        <tr>
+                            <th>Created At:</th>
+                            <td>{{ kot.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        </tr>
+                        {% if kot.approved_by %}
+                        <tr>
+                            <th>Approved By:</th>
+                            <td>{{ kot.approved_by }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            {% if kot.notes %}
+            <div class="row mt-3">
+                <div class="col-12">
+                    <h6>Notes:</h6>
+                    <p class="mb-0">{{ kot.notes }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Items List -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-success text-white">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-list me-2"></i>Requested Items
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Category</th>
+                            <th>Quantity Requested</th>
+                            {% if kot.status == 'approved' %}
+                            <th>Quantity Approved</th>
+                            {% endif %}
+                            <th>Status</th>
+                            {% if kot.status == 'pending' %}
+                            <th>Current Stock</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in kot.items %}
+                        <tr>
+                            <td>{{ item.item.name }}</td>
+                            <td>{{ item.item.category }}</td>
+                            <td>{{ item.quantity_requested }} {{ item.item.unit }}</td>
+                            {% if kot.status == 'approved' %}
+                            <td>{{ item.quantity_approved }} {{ item.item.unit }}</td>
+                            {% endif %}
+                            <td>
+                                <span class="badge bg-{{ 
+                                    'success' if item.status == 'approved'
+                                    else 'warning' if item.status == 'pending'
+                                    else 'danger' 
+                                }}">
+                                    {{ item.status.upper() }}
+                                </span>
+                            </td>
+                            {% if kot.status == 'pending' %}
+                            <td>{{ item.item.current_stock }} {{ item.item.unit }}</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if kot.status == 'pending' %}
+    <!-- Approval Form -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-header bg-warning">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-check-circle me-2"></i>Approve KOT
+            </h5>
+        </div>
+        <div class="card-body">
+            <form id="approvalForm" onsubmit="return approveKot(event)">
+                <input type="hidden" name="kot_id" value="{{ kot.id }}">
+                <div class="mb-3">
+                    <label for="approved_by" class="form-label">Approved By</label>
+                    <input type="text" class="form-control" id="approved_by" name="approved_by" required>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Requested</th>
+                                <th>Approve Quantity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in kot.items %}
+                            <tr>
+                                <td>{{ item.item.name }}</td>
+                                <td>{{ item.quantity_requested }} {{ item.item.unit }}</td>
+                                <td>
+                                    <input type="number" class="form-control" 
+                                           name="approved_quantities[]"
+                                           min="0" max="{{ item.item.current_stock }}"
+                                           step="0.01"
+                                           value="{{ item.quantity_requested }}"
+                                           required>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check me-2"></i>Approve KOT
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if kot.status == 'pending' %}
+<script>
+function approveKot(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    fetch("{{ url_for('inventory.approve_kot') }}", {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error approving KOT: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error approving KOT. Please try again.');
+    });
+    
+    return false;
+}
+</script>
+{% endif %}
+{% endblock %}
