@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+
+{% block title %}Billing Reports{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">
+<style>
+    .stats-card {
+        transition: all 0.3s ease;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 2rem;
+    }
+    
+    .table th {
+        background-color: #f8f9fa;
+    }
+    
+    .status-badge {
+        width: 100px;
+    }
+    
+    .daterangepicker {
+        font-family: 'Poppins', sans-serif;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h2>
+                <i class="fas fa-chart-line me-2"></i>Billing Reports
+            </h2>
+        </div>
+    </div>
+
+    <!-- Date Range Filter -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form id="reportForm" class="row g-3 align-items-center">
+                <div class="col-md-4">
+                    <label for="dateRange" class="form-label">Date Range</label>
+                    <input type="text" class="form-control" id="dateRange" name="dateRange" 
+                           value="{{ stats.start_date }} - {{ stats.end_date }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="status" class="form-label">Order Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="">All Statuses</option>
+                        <option value="completed">Completed</option>
+                        <option value="pending">Pending</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter me-2"></i>Apply Filters
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card stats-card bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Sales</h6>
+                    <h2 class="mb-0">₹{{ "%.2f"|format(stats.total_sales) }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Orders</h6>
+                    <h2 class="mb-0">{{ stats.total_orders }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Completed Orders</h6>
+                    <h2 class="mb-0">{{ stats.completed_orders }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card bg-danger text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Cancelled Orders</h6>
+                    <h2 class="mb-0">{{ stats.cancelled_orders }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Daily Sales</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="salesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Order Status Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Order History</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Order #</th>
+                            <th>Date</th>
+                            <th>Table</th>
+                            <th>Items</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td>{{ order.order_number }}</td>
+                            <td>{{ order.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>{{ order.table_number }}</td>
+                            <td>{{ order.items|length }}</td>
+                            <td>₹{{ "%.2f"|format(order.total_amount) }}</td>
+                            <td>
+                                <span class="badge status-badge bg-{{ 
+                                    'success' if order.status == 'completed' 
+                                    else 'warning' if order.status == 'pending' 
+                                    else 'danger' 
+                                }}">
+                                    {{ order.status.title() }}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" 
+                                        onclick="viewOrderDetails('{{ order.id }}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Order Details Modal -->
+<div class="modal fade" id="orderModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Order Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="orderModalBody">
+                <!-- Content will be loaded dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+
+<script>
+// Initialize date range picker
+$('#dateRange').daterangepicker({
+    startDate: moment('{{ stats.start_date }}'),
+    endDate: moment('{{ stats.end_date }}'),
+    ranges: {
+       'Today': [moment(), moment()],
+       'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+       'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+       'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+       'This Month': [moment().startOf('month'), moment().endOf('month')],
+       'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
+    }
+});
+
+// Initialize charts
+const salesCtx = document.getElementById('salesChart').getContext('2d');
+const statusCtx = document.getElementById('statusChart').getContext('2d');
+
+// Sample data for charts (replace with actual data from backend)
+const salesChart = new Chart(salesCtx, {
+    type: 'line',
+    data: {
+        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        datasets: [{
+            label: 'Daily Sales',
+            data: [12000, 19000, 15000, 17000, 22000, 25000, 20000],
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false
+    }
+});
+
+const statusChart = new Chart(statusCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Completed', 'Pending', 'Cancelled'],
+        datasets: [{
+            data: [
+                "{{ stats.completed_orders }}",
+                "{{ stats.total_orders - stats.completed_orders - stats.cancelled_orders }}",
+                "{{ stats.cancelled_orders }}"
+            ].map(Number),
+            backgroundColor: [
+                'rgb(40, 167, 69)',
+                'rgb(255, 193, 7)',
+                'rgb(220, 53, 69)'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false
+    }
+});
+
+// View order details
+function viewOrderDetails(orderId) {
+    // Fetch order details from backend
+    fetch(`/billing/api/orders/${orderId}`)
+        .then(response => response.json())
+        .then(data => {
+            const modal = new bootstrap.Modal(document.getElementById('orderModal'));
+            document.getElementById('orderModalBody').innerHTML = `
+                <div class="table-responsive">
+                    <table class="table">
+                        <tr>
+                            <th>Order Number:</th>
+                            <td>${data.order_number}</td>
+                            <th>Date:</th>
+                            <td>${new Date(data.created_at).toLocaleString()}</td>
+                        </tr>
+                        <tr>
+                            <th>Table Number:</th>
+                            <td>${data.table_number}</td>
+                            <th>Status:</th>
+                            <td>${data.status}</td>
+                        </tr>
+                    </table>
+                    
+                    <h6 class="mt-4">Order Items</h6>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Quantity</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.items.map(item => `
+                                <tr>
+                                    <td>${item.item_name}</td>
+                                    <td>${item.quantity}</td>
+                                    <td>₹${item.unit_price.toFixed(2)}</td>
+                                    <td>₹${item.total_price.toFixed(2)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="3">Total Amount:</th>
+                                <th>₹${data.total_amount.toFixed(2)}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            `;
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error fetching order details');
+        });
+}
+
+// Form submission
+document.getElementById('reportForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const dateRange = document.getElementById('dateRange').value.split(' - ');
+    const status = document.getElementById('status').value;
+    
+    // Redirect with query parameters
+    window.location.href = `{{ url_for('billing.reports') }}?start_date=${dateRange[0]}&end_date=${dateRange[1]}&status=${status}`;
+});
+</script>
+{% endblock %}
