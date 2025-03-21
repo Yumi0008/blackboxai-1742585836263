@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Vendor Dashboard{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>
+                <i class="fas fa-truck me-2"></i>Vendor Dashboard
+            </h2>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bolt me-2"></i>Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-3">
+                        <a href="{{ url_for('vendor.add_vendor') }}" class="btn btn-outline-primary btn-lg">
+                            <i class="fas fa-user-plus me-2"></i>Add New Vendor
+                        </a>
+                        <a href="{{ url_for('vendor.add_order') }}" class="btn btn-outline-success btn-lg">
+                            <i class="fas fa-file-alt me-2"></i>Create Purchase Order
+                        </a>
+                        <a href="{{ url_for('vendor.add_payment') }}" class="btn btn-outline-info btn-lg">
+                            <i class="fas fa-money-bill-wave me-2"></i>Record Payment
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="col-md-8">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>Statistics
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body">
+                                    <h6 class="card-title">Total Vendors</h6>
+                                    <h2 class="mb-0">{{ stats.total_vendors }}</h2>
+                                    <small>{{ stats.active_vendors }} Active</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-warning text-dark">
+                                <div class="card-body">
+                                    <h6 class="card-title">Pending Orders</h6>
+                                    <h2 class="mb-0">{{ stats.pending_orders }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body">
+                                    <h6 class="card-title">Pending Payments</h6>
+                                    <h2 class="mb-0">{{ stats.pending_payments }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <h6 class="card-title">Orders This Month</h6>
+                                    <h2 class="mb-0" id="monthlyOrders">-</h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Orders -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history me-2"></i>Recent Orders
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Vendor</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Payment</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in recent_orders %}
+                                <tr>
+                                    <td>{{ order.order_number }}</td>
+                                    <td>{{ order.vendor.name }}</td>
+                                    <td>{{ order.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>₹{{ "%.2f"|format(order.total_amount) }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 
+                                            'success' if order.status == 'received'
+                                            else 'warning' if order.status == 'placed'
+                                            else 'info' if order.status == 'confirmed'
+                                            else 'danger' if order.status == 'cancelled'
+                                            else 'secondary'
+                                        }}">
+                                            {{ order.status.upper() }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ 
+                                            'success' if order.payment_status == 'paid'
+                                            else 'warning' if order.payment_status == 'partial'
+                                            else 'danger'
+                                        }}">
+                                            {{ order.payment_status.upper() }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('vendor.order_details', order_id=order.id) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer text-end">
+                    <a href="{{ url_for('vendor.orders') }}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-list me-2"></i>View All Orders
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Summary -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-money-check-alt me-2"></i>Payment Summary
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="paymentSummary">
+                        Loading payment summary...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Function to load monthly orders count
+function loadMonthlyOrders() {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    
+    fetch(`/vendor/api/orders?start_date=${startOfMonth}&end_date=${endOfMonth}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('monthlyOrders').textContent = data.length;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('monthlyOrders').textContent = 'Error';
+        });
+}
+
+// Function to load payment summary
+function loadPaymentSummary() {
+    fetch('/vendor/api/payments')
+        .then(response => response.json())
+        .then(payments => {
+            // Group payments by vendor
+            const vendorPayments = {};
+            payments.forEach(payment => {
+                if (!vendorPayments[payment.vendor_id]) {
+                    vendorPayments[payment.vendor_id] = {
+                        total: 0,
+                        recent: []
+                    };
+                }
+                vendorPayments[payment.vendor_id].total += payment.amount;
+                if (vendorPayments[payment.vendor_id].recent.length < 3) {
+                    vendorPayments[payment.vendor_id].recent.push(payment);
+                }
+            });
+            
+            // Create summary HTML
+            const summaryHtml = Object.entries(vendorPayments).map(([vendorId, data]) => `
+                <div class="alert alert-light mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">Vendor #${vendorId}</h6>
+                            <small class="text-muted">
+                                Total Payments: ₹${data.total.toFixed(2)}
+                            </small>
+                        </div>
+                        <a href="/vendor/payments?vendor_id=${vendorId}" 
+                           class="btn btn-sm btn-outline-primary">
+                            View All
+                        </a>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('paymentSummary').innerHTML = summaryHtml || 
+                '<div class="alert alert-info mb-0">No payment records found.</div>';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('paymentSummary').innerHTML = `
+                <div class="alert alert-danger mb-0">
+                    Error loading payment summary. Please refresh the page.
+                </div>
+            `;
+        });
+}
+
+// Load data when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    loadMonthlyOrders();
+    loadPaymentSummary();
+});
+</script>
+{% endblock %}
