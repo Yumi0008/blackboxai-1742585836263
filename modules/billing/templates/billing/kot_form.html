@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}Generate KOT{% endblock %}
+
+{% block extra_css %}
+<style>
+    .item-row {
+        transition: all 0.3s ease;
+    }
+    .item-row:hover {
+        background-color: #f8f9fa;
+    }
+    .remove-item {
+        transition: all 0.2s ease;
+    }
+    .remove-item:hover {
+        transform: scale(1.1);
+    }
+    .total-section {
+        font-size: 1.2rem;
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>
+                <i class="fas fa-receipt me-2"></i>Generate KOT
+            </h2>
+        </div>
+    </div>
+
+    <form id="kotForm" method="POST" action="{{ url_for('billing.kot') }}">
+        <div class="row g-4">
+            <!-- Order Details -->
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Order Details
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="table_number" class="form-label">Table Number</label>
+                            <input type="text" class="form-control" id="table_number" name="table_number" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="customer_name" class="form-label">Customer Name</label>
+                            <input type="text" class="form-control" id="customer_name" name="customer_name">
+                        </div>
+                        <div class="mb-3">
+                            <label for="priority" class="form-label">Priority</label>
+                            <select class="form-select" id="priority" name="priority">
+                                <option value="normal">Normal</option>
+                                <option value="high">High</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notes</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Items -->
+            <div class="col-md-8">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-utensils me-2"></i>Order Items
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="itemsContainer">
+                            <!-- Item rows will be added here -->
+                            <div class="item-row row g-2 align-items-center mb-3">
+                                <div class="col">
+                                    <input type="text" class="form-control item-name" name="items[]" placeholder="Item Name" required>
+                                </div>
+                                <div class="col-2">
+                                    <input type="number" class="form-control item-quantity" name="quantities[]" placeholder="Qty" min="1" value="1" required>
+                                </div>
+                                <div class="col-2">
+                                    <input type="number" class="form-control item-price" name="prices[]" placeholder="Price" step="0.01" required>
+                                </div>
+                                <div class="col-2">
+                                    <span class="item-total">₹0.00</span>
+                                </div>
+                                <div class="col-auto">
+                                    <button type="button" class="btn btn-danger btn-sm remove-item" onclick="removeItem(this)">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-outline-primary mt-3" onclick="addItem()">
+                            <i class="fas fa-plus me-2"></i>Add Item
+                        </button>
+
+                        <div class="total-section mt-4 p-3">
+                            <div class="row align-items-center">
+                                <div class="col">
+                                    <h5 class="mb-0">Total Amount:</h5>
+                                </div>
+                                <div class="col-auto">
+                                    <h5 class="mb-0" id="totalAmount">₹0.00</h5>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-paper-plane me-2"></i>Generate KOT
+                    </button>
+                    <a href="{{ url_for('billing.index') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 2
+    }).format(amount);
+}
+
+function calculateItemTotal(row) {
+    const quantity = parseFloat(row.querySelector('.item-quantity').value) || 0;
+    const price = parseFloat(row.querySelector('.item-price').value) || 0;
+    const total = quantity * price;
+    row.querySelector('.item-total').textContent = formatCurrency(total);
+    return total;
+}
+
+function updateTotal() {
+    const rows = document.querySelectorAll('.item-row');
+    const total = Array.from(rows).reduce((sum, row) => sum + calculateItemTotal(row), 0);
+    document.getElementById('totalAmount').textContent = formatCurrency(total);
+}
+
+function addItem() {
+    const container = document.getElementById('itemsContainer');
+    const newRow = document.createElement('div');
+    newRow.className = 'item-row row g-2 align-items-center mb-3';
+    newRow.innerHTML = `
+        <div class="col">
+            <input type="text" class="form-control item-name" name="items[]" placeholder="Item Name" required>
+        </div>
+        <div class="col-2">
+            <input type="number" class="form-control item-quantity" name="quantities[]" placeholder="Qty" min="1" value="1" required>
+        </div>
+        <div class="col-2">
+            <input type="number" class="form-control item-price" name="prices[]" placeholder="Price" step="0.01" required>
+        </div>
+        <div class="col-2">
+            <span class="item-total">₹0.00</span>
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-danger btn-sm remove-item" onclick="removeItem(this)">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    container.appendChild(newRow);
+    
+    // Add event listeners to new inputs
+    const inputs = newRow.querySelectorAll('input');
+    inputs.forEach(input => {
+        input.addEventListener('input', updateTotal);
+    });
+}
+
+function removeItem(button) {
+    if (document.querySelectorAll('.item-row').length > 1) {
+        button.closest('.item-row').remove();
+        updateTotal();
+    } else {
+        alert('At least one item is required!');
+    }
+}
+
+// Add event listeners to initial inputs
+document.querySelectorAll('.item-quantity, .item-price').forEach(input => {
+    input.addEventListener('input', updateTotal);
+});
+
+// Form validation
+document.getElementById('kotForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Basic validation
+    const items = document.querySelectorAll('.item-name');
+    const quantities = document.querySelectorAll('.item-quantity');
+    const prices = document.querySelectorAll('.item-price');
+    
+    let isValid = true;
+    
+    items.forEach((item, index) => {
+        if (!item.value.trim()) {
+            isValid = false;
+            item.classList.add('is-invalid');
+        }
+        
+        const quantity = quantities[index].value;
+        const price = prices[index].value;
+        
+        if (!quantity || quantity < 1) {
+            isValid = false;
+            quantities[index].classList.add('is-invalid');
+        }
+        
+        if (!price || price <= 0) {
+            isValid = false;
+            prices[index].classList.add('is-invalid');
+        }
+    });
+    
+    if (!document.getElementById('table_number').value.trim()) {
+        isValid = false;
+        document.getElementById('table_number').classList.add('is-invalid');
+    }
+    
+    if (isValid) {
+        this.submit();
+    }
+});
+
+// Remove invalid class on input
+document.querySelectorAll('input').forEach(input => {
+    input.addEventListener('input', function() {
+        this.classList.remove('is-invalid');
+    });
+});
+</script>
+{% endblock %}
