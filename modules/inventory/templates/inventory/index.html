@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory Dashboard{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>
+                <i class="fas fa-boxes me-2"></i>Inventory Dashboard
+            </h2>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bolt me-2"></i>Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-3">
+                        <a href="{{ url_for('inventory.kot') }}" class="btn btn-outline-primary btn-lg">
+                            <i class="fas fa-file-alt me-2"></i>Generate Inventory KOT
+                        </a>
+                        <a href="{{ url_for('inventory.track') }}" class="btn btn-outline-success btn-lg">
+                            <i class="fas fa-search me-2"></i>Track Inventory
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Statistics -->
+        <div class="col-md-8">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>Inventory Statistics
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body">
+                                    <h6 class="card-title">Total Items</h6>
+                                    <h2 class="mb-0">{{ stats.total_items }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-warning text-dark">
+                                <div class="card-body">
+                                    <h6 class="card-title">Low Stock Items</h6>
+                                    <h2 class="mb-0">{{ stats.low_stock_items }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body">
+                                    <h6 class="card-title">Out of Stock</h6>
+                                    <h2 class="mb-0">{{ stats.out_of_stock_items }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <h6 class="card-title">Pending KOTs</h6>
+                                    <h2 class="mb-0">{{ stats.pending_kots }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history me-2"></i>Recent Transactions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Item</th>
+                                    <th>Type</th>
+                                    <th>Quantity</th>
+                                    <th>Reference</th>
+                                    <th>Created By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transaction in recent_transactions %}
+                                <tr>
+                                    <td>{{ transaction.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>{{ transaction.item.name }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 
+                                            'success' if transaction.transaction_type == 'in'
+                                            else 'danger' if transaction.transaction_type == 'out'
+                                            else 'warning' 
+                                        }}">
+                                            {{ transaction.transaction_type.upper() }}
+                                        </span>
+                                    </td>
+                                    <td>{{ transaction.quantity }} {{ transaction.item.unit }}</td>
+                                    <td>{{ transaction.reference_number or '-' }}</td>
+                                    <td>{{ transaction.created_by }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer text-end">
+                    <a href="#" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-list me-2"></i>View All Transactions
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Alerts -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Stock Alerts
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="stockAlerts">
+                        Loading alerts...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Function to load stock alerts
+function loadStockAlerts() {
+    fetch("{{ url_for('inventory.get_items') }}")
+        .then(response => response.json())
+        .then(data => {
+            const alerts = data.filter(item => 
+                item.status === 'low_stock' || item.status === 'out_of_stock'
+            );
+            
+            if (alerts.length === 0) {
+                document.getElementById('stockAlerts').innerHTML = `
+                    <div class="alert alert-success mb-0">
+                        <i class="fas fa-check-circle me-2"></i>No stock alerts at the moment.
+                    </div>
+                `;
+                return;
+            }
+            
+            const alertsHtml = alerts.map(item => `
+                <div class="alert alert-${item.status === 'out_of_stock' ? 'danger' : 'warning'} d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">${item.name}</h6>
+                        <p class="mb-0 small">
+                            Current Stock: ${item.current_stock} ${item.unit}<br>
+                            Minimum Stock: ${item.minimum_stock} ${item.unit}
+                        </p>
+                    </div>
+                    <a href="{{ url_for('inventory.track') }}?item_id=${item.id}" 
+                       class="btn btn-sm btn-outline-dark ms-3">
+                        View Details
+                    </a>
+                </div>
+            `).join('');
+            
+            document.getElementById('stockAlerts').innerHTML = alertsHtml;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('stockAlerts').innerHTML = `
+                <div class="alert alert-danger mb-0">
+                    Error loading stock alerts. Please refresh the page.
+                </div>
+            `;
+        });
+}
+
+// Load alerts when page loads
+document.addEventListener('DOMContentLoaded', loadStockAlerts);
+
+// Refresh alerts every 5 minutes
+setInterval(loadStockAlerts, 300000);
+</script>
+{% endblock %}
